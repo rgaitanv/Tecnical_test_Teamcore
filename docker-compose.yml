@@ -1,0 +1,81 @@
+version: '3.8'
+
+# Define a common section for Airflow services to avoid repetition
+x-airflow-common: &airflow-common
+  image: airflow-local:latest # This will be built from the ./airflow/Dockerfile
+  build:
+    context: .
+    dockerfile: Dockerfile # This now correctly points to ./app/Dockerfile
+  environment:
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    - AIRFLOW__CORE__LOAD_EXAMPLES=false
+    - AIRFLOW__WEBSERVER__SECRET_KEY=a_super_secret_key_change_me
+    # Set user and group to avoid permission issues with mounted volumes.
+    # The GID is set to 0 (root) to allow writing to the host-mounted directories.
+    - AIRFLOW_UID=${AIRFLOW_UID:-50000}
+    - AIRFLOW_GID=0
+  volumes:
+    - ./app/airflow/dags:/opt/airflow/dags
+    - ./app/airflow/logs:/opt/airflow/logs
+    - ./app/airflow/plugins:/opt/airflow/plugins
+    - ./app:/app
+
+  depends_on:
+    - postgres
+
+services:
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  # This service initializes the Airflow database and creates an admin user.
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow_init
+    command: bash -c "airflow db init && airflow users create --role Admin --username admin --firstname admin --lastname admin --email admin@example.com --password admin"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow_webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow_scheduler
+    command: scheduler
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-db-volume:

@@ -1,0 +1,35 @@
+# Airflow
+app/airflow/logs/
+*.pyc
+*.log
+__pycache__/
+.pytest_cache/
+
+# Docker
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Python
+*.egg-info/
+build/
+dist/
+
+# Virtualenv
+.env
+venv/
+.venv/
+env/
+
+# Data files
+app/data/export/
+app/data/local/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Otros
+node_modules/

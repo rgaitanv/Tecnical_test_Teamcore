@@ -1,0 +1,8 @@
+pandas==2.0.3
+psutil==6.1.1
+chardet==5.2.0
+rarfile==4.2
+polars==1.8.2
+pyarrow==17.0.0
+fastparquet==2024.2.0
+psycopg2-binary==2.9.8
